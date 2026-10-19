@@ -1,9 +1,12 @@
 {
   "name": "ari-speedrun",
   "version": "1.0.0",
-  "description": "Make ari reviews faster with webhooks",
+  "description": "Triage dashboard for Ari YSWS review queues",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "concurrently -k -n api,web \"tsx watch server/index.ts\" \"vite --config web/vite.config.ts\"",
+    "build": "vite build --config web/vite.config.ts",
+    "start": "tsx server/index.ts",
+    "typecheck": "tsc -p ."
   },
   "repository": {
     "type": "git",
@@ -16,13 +19,14 @@
     "url": "https://github.com/kashsuks/ari-speedrun/issues"
   },
   "homepage": "https://github.com/kashsuks/ari-speedrun#readme",
-  "private": "true",
+  "private": true,
   "type": "module",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
     "@hono/node-server": "^2.1.5",
     "devalue": "^6.0.3",
     "hono": "^4.13.13",
+    "tsx": "^4.23.15",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -33,7 +37,6 @@
     "concurrently": "^10.0.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.4"
   }

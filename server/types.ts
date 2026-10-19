@@ -147,7 +147,7 @@ export interface DemoProbe {
   finalUrl: string | null;
   status: number | null;
   contentType: string | null;
-  kind: string; // live-site | video | release | store | source-only | download | broken | missing | other
+  kind: string; // live-site | video | release | release-source-only | store | source-only | download | broken | missing
   title: string | null;
   textSample: string | null;
   releaseAssets: string[];

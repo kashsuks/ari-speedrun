@@ -1,3 +1,7 @@
+import { spawn } from "node:child_process";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
@@ -120,7 +124,17 @@ export function buildPrompt(input: {
   return lines.filter(Boolean).join("\n\n");
 }
 
+export function aiReady(): boolean {
+  return env.aiProvider !== "api" || !!client;
+}
+
 export async function judge(prompt: string): Promise<AiVerdict> {
+  if (env.aiProvider === "claude-code") return judgeClaudeCode(prompt);
+  if (env.aiProvider === "codex") return judgeCodex(prompt);
+  return judgeApi(prompt);
+}
+
+async function judgeApi(prompt: string): Promise<AiVerdict> {
   if (!client) throw new Error("ANTHROPIC_API_KEY is not set");
   const res = await client.beta.messages.parse({
     model: env.model,
@@ -135,4 +149,67 @@ export async function judge(prompt: string): Promise<AiVerdict> {
   if (res.stop_reason === "refusal") throw new Error("Claude declined to review this ship");
   if (!res.parsed_output) throw new Error(`Claude returned no structured output (stop: ${res.stop_reason})`);
   return res.parsed_output;
+}
+
+// The CLI providers run with no tools in an empty scratch dir, so they only ever see the prompt.
+const SCRATCH = join(tmpdir(), "ari-speedrun-ai");
+// Claude Code's validator doesn't resolve the draft-2020-12 meta-schema URL, so drop "$schema".
+const { $schema: _, ...verdictSchema } = z.toJSONSchema(Verdict);
+const SCHEMA = JSON.stringify(verdictSchema);
+const CLI_TIMEOUT = 5 * 60_000;
+
+function run(cmd: string, args: string[], stdin: string): Promise<string> {
+  mkdirSync(SCRATCH, { recursive: true });
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { cwd: SCRATCH, stdio: ["pipe", "pipe", "pipe"] });
+    let out = "";
+    let err = "";
+    const timer = setTimeout(() => child.kill("SIGTERM"), CLI_TIMEOUT);
+    child.stdout.on("data", (d) => (out += d));
+    child.stderr.on("data", (d) => (err += d));
+    child.on("error", (e) => {
+      clearTimeout(timer);
+      reject((e as NodeJS.ErrnoException).code === "ENOENT" ? new Error(`${cmd} CLI not found on PATH`) : e);
+    });
+    child.on("close", (code, signal) => {
+      clearTimeout(timer);
+      if (signal) reject(new Error(`${cmd} timed out`));
+      else if (code !== 0) reject(new Error(`${cmd} exited ${code}: ${(err || out).trim().slice(-500)}`));
+      else resolve(out);
+    });
+    child.stdin.end(stdin);
+  });
+}
+
+async function judgeClaudeCode(prompt: string): Promise<AiVerdict> {
+  const out = await run(
+    "claude",
+    ["-p", "--model", env.model, "--output-format", "json", "--json-schema", SCHEMA, "--system-prompt", SYSTEM, "--tools", "", "--no-session-persistence", "--setting-sources", ""],
+    prompt,
+  );
+  const res = JSON.parse(out) as { is_error?: boolean; result?: string; structured_output?: unknown };
+  if (res.is_error) throw new Error(`Claude Code: ${res.result ?? "unknown error"}`);
+  if (!res.structured_output) throw new Error("Claude Code returned no structured output");
+  return Verdict.parse(res.structured_output);
+}
+
+async function judgeCodex(prompt: string): Promise<AiVerdict> {
+  mkdirSync(SCRATCH, { recursive: true });
+  const schemaFile = join(SCRATCH, "verdict.schema.json");
+  writeFileSync(schemaFile, SCHEMA);
+  const outFile = join(SCRATCH, `codex-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+  try {
+    await run(
+      "codex",
+      [
+        "exec", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--color", "never",
+        "-s", "read-only", "-m", env.model, "-c", 'model_reasoning_effort="low"',
+        "--output-schema", schemaFile, "-o", outFile, "-",
+      ],
+      `${SYSTEM}\n\nAnswer only from the material below. Do not run commands or read files.\n\n${prompt}`,
+    );
+    return Verdict.parse(JSON.parse(readFileSync(outFile, "utf8")));
+  } finally {
+    rmSync(outFile, { force: true });
+  }
 }

@@ -5,6 +5,7 @@ import { timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { z } from "zod";
 import { analyzeShip, getRun, listAnalyses, loadAnalysis, saveAnalysis, startRun } from "./analyze.ts";
+import { aiReady } from "./claude.ts";
 import { AriAuthError, getReview, listPrograms, listQueue, submitDecision } from "./ari.ts";
 import { env } from "./env.ts";
 import type { Analysis } from "./types.ts";
@@ -30,7 +31,7 @@ app.onError((err, c) => {
 let programNames = new Map<string, string>();
 
 app.get("/api/config", (c) =>
-  c.json({ hasCookie: !!env.ariCookie, hasAnthropic: !!env.anthropicKey, hasGithub: !!env.githubToken, model: env.model }),
+  c.json({ hasCookie: !!env.ariCookie, aiProvider: env.aiProvider, aiReady: aiReady(), hasGithub: !!env.githubToken, model: env.model }),
 );
 
 app.get("/api/programs", async (c) => {
@@ -146,6 +147,7 @@ if (existsSync("web/dist")) {
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`ari-speedrun listening on http://localhost:${info.port}`);
   if (!env.ariCookie) console.warn("ARI_COOKIE is not set");
-  if (!env.anthropicKey) console.warn("ANTHROPIC_API_KEY is not set: AI checks and notes will be skipped");
+  if (!aiReady()) console.warn("ANTHROPIC_API_KEY is not set: AI checks and notes will be skipped");
+  else console.log(`AI: ${env.aiProvider} (${env.model})`);
   if (!env.appPassword) console.warn("APP_PASSWORD is not set: do not expose this server publicly");
 });

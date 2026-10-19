@@ -27,7 +27,8 @@ export interface ShipSummary {
 
 export interface Config {
   hasCookie: boolean;
-  hasAnthropic: boolean;
+  aiProvider: "api" | "claude-code" | "codex";
+  aiReady: boolean;
   hasGithub: boolean;
   model: string;
 }

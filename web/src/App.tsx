@@ -30,9 +30,9 @@ export function App() {
         <span className="spacer" />
         {config && (
           <span className="cfg">
-            {!config.hasAnthropic && <span className="pill fail">no ANTHROPIC_API_KEY</span>}
+            {!config.aiReady && <span className="pill fail">no ANTHROPIC_API_KEY</span>}
             {!config.hasGithub && <span className="pill warn" title="GitHub API is limited to 60 requests/hour without a token">no GITHUB_TOKEN</span>}
-            <span className="muted">{config.model}</span>
+            <span className="muted">{config.aiProvider} · {config.model}</span>
           </span>
         )}
       </header>

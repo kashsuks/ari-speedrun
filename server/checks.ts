@@ -135,7 +135,11 @@ export function hackatimeCheck(r: AriReview): Check {
   if (outside.length) details.push(`Top files not in repo: ${outside.map((f) => `${f.path} (${hours(f.seconds)})`).join(", ")}`);
   if (r.hours.aiDiscountedSeconds) details.push(`Ari AI-discounted ${hours(r.hours.aiDiscountedSeconds)}`);
   let level: Level = "pass";
-  if (share != null && share < 0.5) level = "fail";
+  if (share != null && share < 0.5) {
+    // Time in a second listed repo (firmware, backend, ...) is expected to show as "not in repo".
+    level = r.ship.extraRepoUrls.length ? "warn" : "fail";
+    if (r.ship.extraRepoUrls.length) details.push(`Ship lists extra repos (${r.ship.extraRepoUrls.join(", ")}); outside time may live there`);
+  }
   else if ((share != null && share < 0.8) || unrelatedNames.length) level = "warn";
   if (unrelatedNames.length) details.push(`Names that don't resemble the repo/title: ${unrelatedNames.join(", ")}`);
   const summary =

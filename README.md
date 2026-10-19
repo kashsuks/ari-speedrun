@@ -25,12 +25,24 @@ Ari's webhooks are program-side only (ingest ships, receive decisions) and canno
 ## Setup
 
 ```sh
-cp .env.example .env   # fill in ARI_COOKIE, ANTHROPIC_API_KEY, optionally GITHUB_TOKEN and APP_PASSWORD
+cp .env.example .env   # fill in ARI_COOKIE, optionally AI_PROVIDER, GITHUB_TOKEN and APP_PASSWORD
 npm install
 npm run dev            # http://localhost:5173 (API on :8787)
 ```
 
 `ARI_COOKIE` only needs `ari_session=...` from your browser's cookies on ari.hackclub.com. It expires; when the app reports the session expired, copy a fresh one.
+
+### AI provider
+
+Set `AI_PROVIDER` in `.env`:
+
+| Provider | Uses | Default model |
+| --- | --- | --- |
+| `api` | `ANTHROPIC_API_KEY`, billed per token | `claude-opus-5-5` |
+| `claude-code` | the `claude` CLI and your Claude subscription | `haiku` |
+| `codex` | the `codex` CLI and your ChatGPT subscription | `gpt-5.6-luna` |
+
+The CLI providers default to the cheapest model to stay inside subscription limits; override with `AI_MODEL`. They run with no tools in an empty temp directory, so the model only sees the ship data in the prompt. The CLI must be installed and logged in on the machine running the server, which makes them a fit for running locally rather than in the Docker image. If `AI_PROVIDER` is unset, the app uses `api` when `ANTHROPIC_API_KEY` is set and `claude-code` otherwise.
 
 A `GITHUB_TOKEN` (no scopes) is strongly recommended: without it GitHub allows 60 API requests an hour, and the app falls back to Ari's per-file data for languages.
 
@@ -43,6 +55,6 @@ docker build -t ari-speedrun .
 docker run -p 8787:8787 --env-file .env -v ari-data:/data ari-speedrun
 ```
 
-Works as-is on Fly.io, Railway, Render or any VPS. **Set `APP_PASSWORD`** before exposing it: the server holds your Ari session and can submit decisions as you. The browser will prompt for it (any username).
+Works as-is on Fly.io, Railway, Render or any VPS. Use `AI_PROVIDER=api` in the container (the image doesn't include the CLIs). **Set `APP_PASSWORD`** before exposing it: the server holds your Ari session and can submit decisions as you. The browser will prompt for it (any username).
 
-Optional env: `CLAUDE_MODEL` (default `claude-opus-5-5`), `ANALYSIS_CONCURRENCY` (default 3), `DATA_DIR`, `PORT`.
+Optional env: `ANALYSIS_CONCURRENCY` (default 3), `DATA_DIR`, `PORT`.

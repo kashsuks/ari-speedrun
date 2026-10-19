@@ -190,6 +190,8 @@ export interface Analysis {
   commitStats: CommitStats;
   ai: AiVerdict | null;
   aiError: string | null;
+  /** Set only after the reviewer submits a decision from the dashboard. */
+  decided?: { decision: "approve" | "changes" | "reject"; at: string; result: unknown } | null;
 }
 
 export interface CommitStats {
